@@ -10,3 +10,4 @@ A CHIP-8 emulator, with extensions.
 ## Resources
 
 * http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+* https://github.com/Skosulor/c8int/tree/master/test
