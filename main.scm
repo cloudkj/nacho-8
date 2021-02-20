@@ -1,10 +1,29 @@
 (use format srfi-4)
 
-;; Macros/functions to write:
-;; * Deferencing V registers
-;;   (u8vector-ref *V* x)
-;;      => (V x)
-;;      => or simply, e.g. V0, V1, etc ??
+;;; Macros
+
+;; Macros for defining instructions with various variables derived from
+;; the two instruction bytes available in scope:
+;;
+;; `nnn` - 12-bit value, the lowest 12 bits of the instruction
+;; `n`   - 4-bit value, the lowest 4 bits of the instruction
+;; `x`   - 4-bit value, the lower 4 bits of the high byte of the instruction
+;; `y`   - 4-bit value, the upper 4 bits of the low byte of the instruction
+;; `kk`  - 8-bit value, the lowest 8 bits of the instruction
+;;
+;; Source: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+
+(define-syntax define-op-with-xy
+  (ir-macro-transformer
+   (lambda (exp inject compare)
+     (let* ((signature (cadr exp))
+            (msb (cadr signature))
+            (lsb (caddr signature))
+            (body (cddr exp)))
+       `(define ,signature
+          (let ((,(inject 'x) (bitwise-and ,msb #xF))
+                (,(inject 'y) (bitwise-and (arithmetic-shift ,lsb -4) #xF)))
+            ,@body))))))
 
 ;; Memory
 
@@ -55,6 +74,9 @@
   (let ((x (bitwise-and msb #xF)))
     (set! *DT* (u8vector-ref *V* x))))
 
+(define-op-with-xy (ld-vx-vy msb lsb)
+  (u8vector-set! *V* y (u8vector-ref *V* x)))
+
 (define (se-vx-byte msb lsb)
   (let ((x (bitwise-and msb #xF)))
     (if (= (u8vector-ref *V* x) lsb)
@@ -82,6 +104,8 @@
          ld-vx-byte)
         ((and (>= msb #x70) (<= msb #x7F))
          add-vx-byte)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #x0 (bitwise-and lsb #xF)))
+         ld-vx-vy)
         ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
          ld-dt-vx)
         (else #f)))
