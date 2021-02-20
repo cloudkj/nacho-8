@@ -9,9 +9,18 @@
 ;; `n`   - 4-bit value, the lowest 4 bits of the instruction
 ;; `x`   - 4-bit value, the lower 4 bits of the high byte of the instruction
 ;; `y`   - 4-bit value, the upper 4 bits of the low byte of the instruction
-;; `kk`  - 8-bit value, the lowest 8 bits of the instruction
 ;;
 ;; Source: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+
+(define-syntax define-op-with-x
+  (ir-macro-transformer
+   (lambda (exp inject compare)
+     (let* ((signature (cadr exp))
+            (msb (cadr signature))
+            (body (cddr exp)))
+       `(define ,signature
+          (let ((,(inject 'x) (bitwise-and ,msb #xF)))
+            ,@body))))))
 
 (define-syntax define-op-with-xy
   (ir-macro-transformer
@@ -62,36 +71,29 @@
 
 ;; Instructions
 
-(define (add-vx-byte msb lsb)
-  (let ((x (bitwise-and msb #xF)))
-    (u8vector-set! *V* x (+ (u8vector-ref *V* x) lsb))))
+(define-op-with-x (add-vx-byte msb lsb)
+  (u8vector-set! *V* x (+ (u8vector-ref *V* x) lsb)))
 
-(define (ld-vx-byte msb lsb)
-  (let ((x (bitwise-and msb #xF)))
-    (u8vector-set! *V* x lsb)))
+(define-op-with-x (ld-vx-byte msb lsb)
+  (u8vector-set! *V* x lsb))
 
-(define (ld-dt-vx msb lsb)
-  (let ((x (bitwise-and msb #xF)))
-    (set! *DT* (u8vector-ref *V* x))))
+(define-op-with-x (ld-dt-vx msb lsb)
+  (set! *DT* (u8vector-ref *V* x)))
 
 (define-op-with-xy (ld-vx-vy msb lsb)
   (u8vector-set! *V* y (u8vector-ref *V* x)))
 
-(define (se-vx-byte msb lsb)
-  (let ((x (bitwise-and msb #xF)))
-    (if (= (u8vector-ref *V* x) lsb)
-        (set! *PC* (+ *PC* 2)))))
+(define-op-with-x (se-vx-byte msb lsb)
+  (if (= (u8vector-ref *V* x) lsb)
+      (set! *PC* (+ *PC* 2))))
 
-(define (se-vx-vy msb lsb)
-  (let ((x (bitwise-and msb #xF))
-        (y (bitwise-and (arithmetic-shift lsb -4) #xF)))
-    (if (= (u8vector-ref *V* x) (u8vector-ref *V* y))
-        (set! *PC* (+ *PC* 2)))))
+(define-op-with-xy (se-vx-vy msb lsb)
+  (if (= (u8vector-ref *V* x) (u8vector-ref *V* y))
+      (set! *PC* (+ *PC* 2))))
 
-(define (sne-vx-byte msb lsb)
-  (let ((x (bitwise-and msb #xF)))
-    (if (not (= (u8vector-ref *V* x) lsb))
-        (set! *PC* (+ *PC* 2)))))
+(define-op-with-x (sne-vx-byte msb lsb)
+  (if (not (= (u8vector-ref *V* x) lsb))
+      (set! *PC* (+ *PC* 2))))
 
 (define (ops msb lsb)
   (cond ((and (>= msb #x30) (<= msb #x3F))
