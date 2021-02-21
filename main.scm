@@ -117,9 +117,29 @@
   (if (= (u8vector-ref *V* x) (u8vector-ref *V* y))
       (set! *PC* (+ *PC* 2))))
 
+(define-op-with-x (shl-vx msb lsb)
+  (let ((Vx (u8vector-ref *V* x)))
+    (u8vector-set! *V* #xF (if (> (bitwise-and Vx #x80) 0) 1 0))
+    (u8vector-set! *V* x (arithmetic-shift Vx 1))))
+
+(define-op-with-x (shr-vx msb lsb)
+  (let ((Vx (u8vector-ref *V* x)))
+    (u8vector-set! *V* #xF (bitwise-and Vx 1))
+    (u8vector-set! *V* x (arithmetic-shift Vx -1))))
+
 (define-op-with-x (sne-vx-byte msb lsb)
   (if (not (= (u8vector-ref *V* x) lsb))
       (set! *PC* (+ *PC* 2))))
+
+(define-op-with-xy (sub-vx-vy msb lsb)
+  (let ((diff (- (u8vector-ref *V* x) (u8vector-ref *V* y))))
+    (u8vector-set! *V* #xF (if (> diff 0) 1 0))
+    (u8vector-set! *V* x (if (< diff 0) (+ #x100 diff) diff))))
+
+(define-op-with-xy (subn-vx-vy msb lsb)
+  (let ((diff (- (u8vector-ref *V* y) (u8vector-ref *V* x))))
+    (u8vector-set! *V* #xF (if (> diff 0) 1 0))
+    (u8vector-set! *V* x (if (< diff 0) (+ #x100 diff) diff))))
 
 (define-op-with-xy (xor-vx-vy msb lsb)
   (u8vector-set! *V* x (bitwise-xor (u8vector-ref *V* x)
@@ -146,6 +166,14 @@
          xor-vx-vy)
         ((and (= #x80 (bitwise-and msb #xF0)) (= #x4 (bitwise-and lsb #xF)))
          add-vx-vy)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #x5 (bitwise-and lsb #xF)))
+         sub-vx-vy)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #x6 (bitwise-and lsb #xF)))
+         shr-vx)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #x7 (bitwise-and lsb #xF)))
+         subn-vx-vy)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #xE (bitwise-and lsb #xF)))
+         shl-vx)
         ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
          ld-dt-vx)
         (else #f)))
@@ -157,8 +185,9 @@
     (if op
         (begin
           (print-instruction msb lsb #f)
-;          (print-registers)
           (op msb lsb)
+;;          (print-registers)
+;;          (print)
           (set! *PC* (+ *PC* 2)))
         (begin
           (print-instruction msb lsb "Instruction not found")
