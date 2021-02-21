@@ -87,6 +87,15 @@
 (define-op-with-x (add-vx-byte msb lsb)
   (u8vector-set! *V* x (+ (u8vector-ref *V* x) lsb)))
 
+(define-op-with-xy (add-vx-vy msb lsb)
+  (let ((sum (+ (u8vector-ref *V* x) (u8vector-ref *V* y))))
+    (u8vector-set! *V* #xF (if (> sum #xFF) 1 0))
+    (u8vector-set! *V* x (bitwise-and sum #xFF))))
+
+(define-op-with-xy (and-vx-vy msb lsb)
+  (u8vector-set! *V* x (bitwise-and (u8vector-ref *V* x)
+                                    (u8vector-ref *V* y))))
+
 (define-op-with-x (ld-vx-byte msb lsb)
   (u8vector-set! *V* x lsb))
 
@@ -112,6 +121,10 @@
   (if (not (= (u8vector-ref *V* x) lsb))
       (set! *PC* (+ *PC* 2))))
 
+(define-op-with-xy (xor-vx-vy msb lsb)
+  (u8vector-set! *V* x (bitwise-xor (u8vector-ref *V* x)
+                                    (u8vector-ref *V* y))))
+
 (define (ops msb lsb)
   (cond ((and (>= msb #x30) (<= msb #x3F))
          se-vx-byte)
@@ -127,6 +140,12 @@
          ld-vx-vy)
         ((and (= #x80 (bitwise-and msb #xF0)) (= #x1 (bitwise-and lsb #xF)))
          or-vx-vy)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #x2 (bitwise-and lsb #xF)))
+         and-vx-vy)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #x3 (bitwise-and lsb #xF)))
+         xor-vx-vy)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #x4 (bitwise-and lsb #xF)))
+         add-vx-vy)
         ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
          ld-dt-vx)
         (else #f)))
