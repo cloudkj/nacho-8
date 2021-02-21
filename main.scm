@@ -112,14 +112,23 @@
 (define-op-with-nnn (jp-v0-addr msb lsb)
   (set! *PC* (+ nnn (u8vector-ref *V* 0))))
 
-(define-op-with-x (ld-vx-byte msb lsb)
-  (u8vector-set! *V* x lsb))
+(define-op-with-x (ld-b-vx msb lsb)
+  (let ((Vx (u8vector-ref *V* x)))
+    (u8vector-set! *ram* *I* (quotient Vx 100))
+    (u8vector-set! *ram* (+ *I* 1) (quotient (modulo Vx 100) 10))
+    (u8vector-set! *ram* (+ *I* 2) (modulo Vx 10))))
 
 (define-op-with-x (ld-dt-vx msb lsb)
   (set! *DT* (u8vector-ref *V* x)))
 
+(define-op-with-nnn (ld-i-addr msb lsb)
+  (set! *I* nnn))
+
 (define-op-with-x (ld-vx-dt msb lsb)
   (u8vector-set! *V* x *DT*))
+
+(define-op-with-x (ld-vx-byte msb lsb)
+  (u8vector-set! *V* x lsb))
 
 (define-op-with-xy (ld-vx-vy msb lsb)
   (u8vector-set! *V* y (u8vector-ref *V* x)))
@@ -210,12 +219,16 @@
               shl-vx)
              ((and (= #x90 (bitwise-and msb #xF0)) (= #x0 (bitwise-and lsb #xF)))
               sne-vx-vy)
+             ((and (>= msb #xA0) (<= msb #xAF))
+              ld-i-addr)
              ((and (>= msb #xC0) (<= msb #xCF))
               rnd-vx-byte)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x07))
               ld-vx-dt)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
               ld-dt-vx)
+             ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x33))
+              ld-b-vx)
              (else #f))))
     (if op
         (lambda ()

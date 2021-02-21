@@ -1,4 +1,4 @@
-nacho-8
+NACHO-8
 -------
 
 A CHIP-8 emulator, with extensions.
