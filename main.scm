@@ -1,5 +1,13 @@
 (use format srfi-4)
 
+;;; Helpers
+
+(define (bytes->hex-string msb lsb)
+  (format #f "0x~2,'0x~2,'0x" msb lsb))
+
+(define (number->hex-string num)
+  (format #f "0x~2,'0x" num))
+
 ;;; Macros
 
 ;; Macros for defining instructions with various variables derived from
@@ -70,17 +78,22 @@
 (define (print-instruction msb lsb error)
   (format #t "0x~3x: " *PC*)
   (if error (format #t "ERROR: ~A - " error))
-  (format #t "0x~2,'0x~2,'0x~%" msb lsb))
+  (print (bytes->hex-string msb lsb)))
 
 (define (print-registers)
-  (let loop ((i 0) (names '()) (values '()))
+  (let loop ((i 0)
+             (names (list "  DT " "  I  "))
+             (values (map (lambda (r) (string-append (number->hex-string r) " "))
+                          (list *DT* *I*))))
     (if (>= i (u8vector-length *V*))
         (begin
           (print (apply string-append (reverse names)))
           (print (apply string-append (reverse values))))
         (loop (+ i 1)
               (cons (format #f "  V~x " i) names)
-              (cons (format #f "0x~2,'0x " (u8vector-ref *V* i)) values)))))
+              (cons (string-append (number->hex-string (u8vector-ref *V* i))
+                                   " ")
+                    values)))))
 
 ;; Instructions
 
@@ -104,6 +117,9 @@
 
 (define-op-with-x (ld-dt-vx msb lsb)
   (set! *DT* (u8vector-ref *V* x)))
+
+(define-op-with-x (ld-vx-dt msb lsb)
+  (u8vector-set! *V* x *DT*))
 
 (define-op-with-xy (ld-vx-vy msb lsb)
   (u8vector-set! *V* y (u8vector-ref *V* x)))
@@ -196,6 +212,8 @@
               sne-vx-vy)
              ((and (>= msb #xC0) (<= msb #xCF))
               rnd-vx-byte)
+             ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x07))
+              ld-vx-dt)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
               ld-dt-vx)
              (else #f))))
@@ -219,6 +237,7 @@
         (loop (+ i 1))))))
 
 ;; Execution
+;; TODO: implement clock rate
 (define (execute)
   (let* ((msb (u8vector-ref *ram* *PC*))
          (lsb (u8vector-ref *ram* (+ *PC* 1)))
@@ -226,6 +245,9 @@
     (if op
         (begin
           (print-instruction msb lsb #f)
+;;          (print-registers) (print)
+          (if (> *DT* 0) (set! *DT* (- *DT* 1)))
+          (if (> *ST* 0) (set! *ST* (- *ST* 1)))
           (op))
         (begin
           (print-instruction msb lsb "Instruction not found")
