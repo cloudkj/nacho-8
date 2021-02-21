@@ -12,6 +12,19 @@
 ;;
 ;; Source: http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 
+(define-syntax define-op-with-nnn
+  (ir-macro-transformer
+   (lambda (exp inject compare)
+     (let* ((signature (cadr exp))
+            (msb (cadr signature))
+            (lsb (caddr signature))
+            (body (cddr exp)))
+       `(define ,signature
+          (let ((,(inject 'nnn) (bitwise-ior
+                                 (arithmetic-shift (bitwise-and ,msb #xF) 8)
+                                 ,lsb)))
+            ,@body))))))
+
 (define-syntax define-op-with-x
   (ir-macro-transformer
    (lambda (exp inject compare)
@@ -83,6 +96,10 @@
 (define-op-with-xy (ld-vx-vy msb lsb)
   (u8vector-set! *V* y (u8vector-ref *V* x)))
 
+(define-op-with-xy (or-vx-vy msb lsb)
+  (u8vector-set! *V* x (bitwise-ior (u8vector-ref *V* x)
+                                    (u8vector-ref *V* y))))
+
 (define-op-with-x (se-vx-byte msb lsb)
   (if (= (u8vector-ref *V* x) lsb)
       (set! *PC* (+ *PC* 2))))
@@ -108,6 +125,8 @@
          add-vx-byte)
         ((and (= #x80 (bitwise-and msb #xF0)) (= #x0 (bitwise-and lsb #xF)))
          ld-vx-vy)
+        ((and (= #x80 (bitwise-and msb #xF0)) (= #x1 (bitwise-and lsb #xF)))
+         or-vx-vy)
         ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
          ld-dt-vx)
         (else #f)))
