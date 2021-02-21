@@ -49,7 +49,7 @@
 
 ;; Memory
 
-(define *ram* (make-u8vector (* 4 1024)))
+(define *ram* (make-u8vector (* 4 1024) 0))
 
 ;; Registers
 
@@ -96,6 +96,9 @@
   (u8vector-set! *V* x (bitwise-and (u8vector-ref *V* x)
                                     (u8vector-ref *V* y))))
 
+(define-op-with-nnn (jp-v0-addr msb lsb)
+  (set! *PC* (+ nnn (u8vector-ref *V* 0))))
+
 (define-op-with-x (ld-vx-byte msb lsb)
   (u8vector-set! *V* x lsb))
 
@@ -131,6 +134,10 @@
   (if (not (= (u8vector-ref *V* x) lsb))
       (set! *PC* (+ *PC* 2))))
 
+(define-op-with-xy (sne-vx-vy msb lsb)
+  (if (not (= (u8vector-ref *V* x) (u8vector-ref *V* y)))
+      (set! *PC* (+ *PC* 2))))
+
 (define-op-with-xy (sub-vx-vy msb lsb)
   (let ((diff (- (u8vector-ref *V* x) (u8vector-ref *V* y))))
     (u8vector-set! *V* #xF (if (> diff 0) 1 0))
@@ -150,7 +157,7 @@
          se-vx-byte)
         ((and (>= msb #x40) (<= msb #x4F))
          sne-vx-byte)
-        ((and (>= msb #x50) (<= msb #x5F))
+        ((and (= #x50 (bitwise-and msb #xF0)) (= #x0 (bitwise-and lsb #xF)))
          se-vx-vy)
         ((and (>= msb #x60) (<= msb #x6F))
          ld-vx-byte)
@@ -174,6 +181,10 @@
          subn-vx-vy)
         ((and (= #x80 (bitwise-and msb #xF0)) (= #xE (bitwise-and lsb #xF)))
          shl-vx)
+        ((and (= #x90 (bitwise-and msb #xF0)) (= #x0 (bitwise-and lsb #xF)))
+         sne-vx-vy)
+        ((and (>= msb #xB0) (<= msb #xBF))
+         jp-v0-addr)
         ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
          ld-dt-vx)
         (else #f)))
