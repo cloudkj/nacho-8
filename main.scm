@@ -112,6 +112,9 @@
   (u8vector-set! *V* x (bitwise-ior (u8vector-ref *V* x)
                                     (u8vector-ref *V* y))))
 
+(define-op-with-x (rnd-vx-byte msb lsb)
+  (u8vector-set! *V* x (bitwise-and (random #x100) lsb)))
+
 (define-op-with-x (se-vx-byte msb lsb)
   (if (= (u8vector-ref *V* x) lsb)
       (set! *PC* (+ *PC* 2))))
@@ -191,6 +194,8 @@
               shl-vx)
              ((and (= #x90 (bitwise-and msb #xF0)) (= #x0 (bitwise-and lsb #xF)))
               sne-vx-vy)
+             ((and (>= msb #xC0) (<= msb #xCF))
+              rnd-vx-byte)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
               ld-dt-vx)
              (else #f))))
