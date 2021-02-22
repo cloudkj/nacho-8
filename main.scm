@@ -97,6 +97,9 @@
 
 ;; Instructions
 
+(define-op-with-x (add-i-vx msb lsb)
+  (set! *I* (+ *I* (u8vector-ref *V* x))))
+
 (define-op-with-x (add-vx-byte msb lsb)
   (u8vector-set! *V* x (+ (u8vector-ref *V* x) lsb)))
 
@@ -123,6 +126,13 @@
 
 (define-op-with-nnn (ld-i-addr msb lsb)
   (set! *I* nnn))
+
+(define-op-with-x (ld-i-vx msb lsb)
+  (let loop ((i 0))
+    (if (<= i x)
+        (begin
+          (u8vector-set! *ram* (+ *I* i) (u8vector-ref *V* i))
+          (loop (+ i 1))))))
 
 (define-op-with-x (ld-vx-dt msb lsb)
   (u8vector-set! *V* x *DT*))
@@ -234,8 +244,12 @@
               ld-vx-dt)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
               ld-dt-vx)
+             ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x1E))
+              add-i-vx)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x33))
               ld-b-vx)
+             ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x55))
+              ld-i-vx)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x65))
               ld-vx-i)
              (else #f))))
