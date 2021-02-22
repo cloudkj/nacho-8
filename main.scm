@@ -130,6 +130,13 @@
 (define-op-with-x (ld-vx-byte msb lsb)
   (u8vector-set! *V* x lsb))
 
+(define-op-with-x (ld-vx-i msb lsb)
+  (let loop ((i 0))
+    (if (<= i x)
+        (begin
+          (u8vector-set! *V* i (u8vector-ref *ram* (+ *I* i)))
+          (loop (+ i 1))))))
+
 (define-op-with-xy (ld-vx-vy msb lsb)
   (u8vector-set! *V* y (u8vector-ref *V* x)))
 
@@ -229,6 +236,8 @@
               ld-dt-vx)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x33))
               ld-b-vx)
+             ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x65))
+              ld-vx-i)
              (else #f))))
     (if op
         (lambda ()
