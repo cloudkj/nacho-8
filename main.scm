@@ -174,12 +174,14 @@
                                     (u8vector-ref *V* y))))
 
 (define-op-with-xyn (drw-vx-vy-nibble msb lsb)
-  (let loop ((i 0))
-    (if (< i n)
-        (let ((byte (u8vector-ref *ram* (+ *I* i)))
-              (y (modulo (+ y i) *rows*)))
-          (update-pixels x y byte)
-          (loop (+ i 1)))))
+  (let loop ((i 0)
+             (collision #f))
+    (if (>= i n)
+        (u8vector-set! *V* #xF (if collision 1 0))
+        (let* ((byte (u8vector-ref *ram* (+ *I* i)))
+               (y (modulo (+ y i) *rows*))
+               (result (update-pixels x y byte)))
+          (loop (+ i 1) (or collision result)))))
   ;; TODO: remove debugging
   (print-pixels))
 
