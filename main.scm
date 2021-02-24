@@ -5,6 +5,9 @@
 (define (bytes->hex-string msb lsb)
   (format #f "0x~2,'0x~2,'0x" msb lsb))
 
+(define (number->binary-string num)
+  (format #f "~32,'0b" num))
+
 (define (number->hex-string num)
   (format #f "0x~2,'0x" num))
 
@@ -55,6 +58,19 @@
                 (,(inject 'y) (bitwise-and (arithmetic-shift ,lsb -4) #xF)))
             ,@body))))))
 
+(define-syntax define-op-with-xyn
+  (ir-macro-transformer
+   (lambda (exp inject compare)
+     (let* ((signature (cadr exp))
+            (msb (cadr signature))
+            (lsb (caddr signature))
+            (body (cddr exp)))
+       `(define ,signature
+          (let ((,(inject 'x) (bitwise-and ,msb #xF))
+                (,(inject 'y) (bitwise-and (arithmetic-shift ,lsb -4) #xF))
+                (,(inject 'n) (bitwise-and ,lsb #xF)))
+            ,@body))))))
+
 ;; Memory
 
 (define *ram* (make-u8vector (* 4 1024) 0))
@@ -73,12 +89,57 @@
 (define *DT* 0)
 (define *ST* 0)
 
-;; Debugging
+;;; Display
+
+(define *rows* 32)
+(define *cols* 64)
+
+;; The display pixels are a 64x32 bitmap represented by a 64-length vector of
+;; 32-bit values, where each pair of 32-bit values represents a row of pixels.
+(define *cols-per-value* 32)
+(define *values-per-row* 2)
+(define *pixels* (make-u32vector (* (/ *cols* *cols-per-value*) *rows*) 0))
+
+;; Returns #t if the pixel was erased (i.e. 1 -> 0)
+(define (update-pixel x y val)
+  (let* ((index (if (< x *cols-per-value*)
+                    (* *values-per-row* y)
+                    (+ (* *values-per-row* y) 1)))
+         (pixels (u32vector-ref *pixels* index))
+         (shift (- *cols-per-value* (modulo x *cols-per-value*) 1))
+         (curr (if (= (bitwise-and (arithmetic-shift #x1 shift) pixels) 0) 0 1)))
+    (u32vector-set! *pixels* index
+                    (bitwise-ior (arithmetic-shift (bitwise-xor curr val) shift)
+                                 pixels))
+    ;; Current pixel is erased iff both are 1
+    (and (= curr 1) (= val 1))))
+
+;; Returns #t if any pixels were erased (i.e. 1 -> 0)
+(define (update-pixels x y byte)
+  (let loop ((i 0)
+             (erased #f))
+    (if (>= i 8)
+        erased
+        (let* ((mask (arithmetic-shift 1 (- 7 i)))
+               (val (if (= (bitwise-and mask byte) 0) 0 1))
+               (x (modulo (+ x i) *cols*))
+               (result (update-pixel x y val)))
+          (loop (+ i 1) (or erased result))))))
+
+;;; Debugging
 
 (define (print-instruction msb lsb error)
   (format #t "0x~3x: " *PC*)
   (if error (format #t "ERROR: ~A - " error))
   (print (bytes->hex-string msb lsb)))
+
+(define (print-pixels)
+  (let loop ((i 0))
+    (if (< i (u32vector-length *pixels*))
+        (begin
+          (print (number->binary-string (u32vector-ref *pixels* i))
+                 (number->binary-string (u32vector-ref *pixels* (+ i 1))))
+          (loop (+ i 2))))))
 
 (define (print-registers)
   (let loop ((i 0)
@@ -111,6 +172,16 @@
 (define-op-with-xy (and-vx-vy msb lsb)
   (u8vector-set! *V* x (bitwise-and (u8vector-ref *V* x)
                                     (u8vector-ref *V* y))))
+
+(define-op-with-xyn (drw-vx-vy-nibble msb lsb)
+  (let loop ((i 0))
+    (if (< i n)
+        (let ((byte (u8vector-ref *ram* (+ *I* i)))
+              (y (modulo (+ y i) *rows*)))
+          (update-pixels x y byte)
+          (loop (+ i 1)))))
+  ;; TODO: remove debugging
+  (print-pixels))
 
 (define-op-with-nnn (jp-v0-addr msb lsb)
   (set! *PC* (+ nnn (u8vector-ref *V* 0))))
@@ -240,6 +311,8 @@
               ld-i-addr)
              ((and (>= msb #xC0) (<= msb #xCF))
               rnd-vx-byte)
+             ((and (>= msb #xD0) (<= msb #xDF))
+              drw-vx-vy-nibble)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x07))
               ld-vx-dt)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
