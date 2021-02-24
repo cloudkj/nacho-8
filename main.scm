@@ -1,4 +1,4 @@
-(use format srfi-4)
+(use ezxdisp format srfi-4)
 
 ;;; Helpers
 
@@ -8,8 +8,11 @@
 (define (number->binary-string num)
   (format #f "~32,'0b" num))
 
-(define (number->hex-string num)
+(define (u8->hex-string num)
   (format #f "0x~2,'0x" num))
+
+(define (u16->hex-string num)
+  (format #f "0x~4,'0x" num))
 
 ;;; Macros
 
@@ -77,10 +80,10 @@
 
 ;; Registers
 
-(define *stack* (make-u16vector 16))
+(define *stack* (make-u16vector 16 0))
 
 (define *PC* #x200)
-(define *SP* 0)
+(define *SP* -1)
 
 (define *V* (make-u8vector 16 0))
 
@@ -100,6 +103,12 @@
 (define *values-per-row* 2)
 (define *pixels* (make-u32vector (* (/ *cols* *cols-per-value*) *rows*) 0))
 
+;; TODO: define helper primitives around ezx
+(define ezx (ezx-init *cols* *rows*))
+(define black (make-ezx-color 1 0 0))
+(define white (make-ezx-color 1 1 1))
+(ezx-set-background ezx white)
+
 ;; Returns #t if the pixel was erased (i.e. 1 -> 0)
 (define (update-pixel x y val)
   (let* ((index (if (< x *cols-per-value*)
@@ -107,10 +116,18 @@
                     (+ (* *values-per-row* y) 1)))
          (pixels (u32vector-ref *pixels* index))
          (shift (- *cols-per-value* (modulo x *cols-per-value*) 1))
-         (curr (if (= (bitwise-and (arithmetic-shift #x1 shift) pixels) 0) 0 1)))
-    (u32vector-set! *pixels* index
-                    (bitwise-ior (arithmetic-shift (bitwise-xor curr val) shift)
-                                 pixels))
+         (curr (if (= (bitwise-and (arithmetic-shift #x1 shift) pixels) 0) 0 1))
+         (new (bitwise-xor curr val)))
+    ;; Update pixel bitmap
+    (u32vector-set!
+     *pixels*
+     index
+     ;; Set current bit to new value
+     (bitwise-ior (arithmetic-shift new shift)
+                  ;; Clear current bit
+                  (bitwise-and pixels (bitwise-not (arithmetic-shift #x1 shift)))))
+    ;; Draw pixel
+    (ezx-point-2d ezx x y (if (> new 0) black white))
     ;; Current pixel is erased iff both are 1
     (and (= curr 1) (= val 1))))
 
@@ -144,7 +161,7 @@
 (define (print-registers)
   (let loop ((i 0)
              (names (list "  DT " "  I  "))
-             (values (map (lambda (r) (string-append (number->hex-string r) " "))
+             (values (map (lambda (r) (string-append (u8->hex-string r) " "))
                           (list *DT* *I*))))
     (if (>= i (u8vector-length *V*))
         (begin
@@ -152,9 +169,15 @@
           (print (apply string-append (reverse values))))
         (loop (+ i 1)
               (cons (format #f "  V~x " i) names)
-              (cons (string-append (number->hex-string (u8vector-ref *V* i))
+              (cons (string-append (u8->hex-string (u8vector-ref *V* i))
                                    " ")
                     values)))))
+
+(define (print-stack)
+  (print "SP: " *SP* " stack size: " (+ *SP* 1))
+  (print (apply string-append
+                (map (lambda (r) (string-append (u16->hex-string r) " "))
+                     (u16vector->list *stack*)))))
 
 ;; Instructions
 
@@ -173,17 +196,27 @@
   (u8vector-set! *V* x (bitwise-and (u8vector-ref *V* x)
                                     (u8vector-ref *V* y))))
 
+(define-op-with-nnn (call-addr msb lsb)
+  (set! *SP* (+ *SP* 1))
+  ;; Note: PC + 2 should be pushed onto stack to allow subroutine to return to
+  ;; instruction _after_ the invocation
+  (u16vector-set! *stack* *SP* (+ *PC* 2))
+  (set! *PC* nnn))
+
 (define-op-with-xyn (drw-vx-vy-nibble msb lsb)
-  (let loop ((i 0)
-             (collision #f))
-    (if (>= i n)
-        (u8vector-set! *V* #xF (if collision 1 0))
-        (let* ((byte (u8vector-ref *ram* (+ *I* i)))
-               (y (modulo (+ y i) *rows*))
-               (result (update-pixels x y byte)))
-          (loop (+ i 1) (or collision result)))))
-  ;; TODO: remove debugging
-  (print-pixels))
+  (let ((Vx (u8vector-ref *V* x))
+        (Vy (u8vector-ref *V* y)))
+    (let loop ((i 0)
+               (collision #f))
+      (if (>= i n)
+          (u8vector-set! *V* #xF (if collision 1 0))
+          (let* ((byte (u8vector-ref *ram* (+ *I* i)))
+                 (row (modulo (+ Vy i) *rows*))
+                 (result (update-pixels Vx row byte)))
+            (loop (+ i 1) (or collision result)))))))
+
+(define-op-with-nnn (jp-addr msb lsb)
+  (set! *PC* nnn))
 
 (define-op-with-nnn (jp-v0-addr msb lsb)
   (set! *PC* (+ nnn (u8vector-ref *V* 0))))
@@ -226,6 +259,10 @@
 (define-op-with-xy (or-vx-vy msb lsb)
   (u8vector-set! *V* x (bitwise-ior (u8vector-ref *V* x)
                                     (u8vector-ref *V* y))))
+
+(define (ret msb lsb)
+  (set! *PC* (u16vector-ref *stack* *SP*))
+  (set! *SP* (- *SP* 1)))
 
 (define-op-with-x (rnd-vx-byte msb lsb)
   (u8vector-set! *V* x (bitwise-and (random #x100) lsb)))
@@ -272,6 +309,12 @@
 
 (define (jump-ops msb lsb)
   (let ((op (cond
+             ((and (= msb #x00) (= lsb #xEE))
+              ret)
+             ((and (>= msb #x10) (<= msb #x1F))
+              jp-addr)
+             ((and (>= msb #x20) (<= msb #x2F))
+              call-addr)
              ((and (>= msb #xB0) (<= msb #xBF))
               jp-v0-addr)
              (else #f))))
@@ -340,7 +383,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Load test ROM
-(let ((port (open-input-file "c8_test.c8")))
+(let ((port (open-input-file "test_opcode.ch8")))
+;;(let ((port (open-input-file "c8_test.c8")))
   (let loop ((i 0))
     (let ((c (read-char port)))
       (unless (eof-object? c)
@@ -355,6 +399,7 @@
          (op (or (jump-ops msb lsb) (ops msb lsb))))
     (if op
         (begin
+          (ezx-redraw ezx)          
           (print-instruction msb lsb #f)
 ;;          (print-registers) (print)
           (if (> *DT* 0) (set! *DT* (- *DT* 1)))
