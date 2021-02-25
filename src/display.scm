@@ -29,16 +29,6 @@
 (define (refresh-display)
   (ezx-redraw *ezx*))
 
-;;; Debugging helpers
-
-(define (print-pixels)
-  (let loop ((i 0))
-    (if (< i (u32vector-length *pixels*))
-        (begin
-          (print (number->binary-string (u32vector-ref *pixels* i))
-                 (number->binary-string (u32vector-ref *pixels* (+ i 1))))
-          (loop (+ i 2))))))
-
 ;;; Display functions
 
 ;; Returns #t if the pixel was erased (i.e. 1 -> 0)
