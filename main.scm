@@ -1,18 +1,6 @@
+(declare (uses util))
+
 (use ezxdisp format srfi-4)
-
-;;; Helpers
-
-(define (bytes->hex-string msb lsb)
-  (format #f "0x~2,'0x~2,'0x" msb lsb))
-
-(define (number->binary-string num)
-  (format #f "~32,'0b" num))
-
-(define (u8->hex-string num)
-  (format #f "0x~2,'0x" num))
-
-(define (u16->hex-string num)
-  (format #f "0x~4,'0x" num))
 
 ;;; Macros
 
@@ -78,7 +66,7 @@
 
 (define *ram* (make-u8vector (* 4 1024) 0))
 
-;; Registers
+;;; Registers
 
 (define *stack* (make-u16vector 16 0))
 
@@ -102,6 +90,8 @@
 (define *cols-per-value* 32)
 (define *values-per-row* 2)
 (define *pixels* (make-u32vector (* (/ *cols* *cols-per-value*) *rows*) 0))
+
+;; ezxdisp helpers
 
 (define *ezx* (ezx-init *cols* *rows* ""))
 (define *color-black* (make-ezx-color 0 0 0))
