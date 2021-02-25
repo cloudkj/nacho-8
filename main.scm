@@ -103,32 +103,37 @@
 (define *values-per-row* 2)
 (define *pixels* (make-u32vector (* (/ *cols* *cols-per-value*) *rows*) 0))
 
-;; TODO: define helper primitives around ezx
-(define ezx (ezx-init *cols* *rows*))
-(define black (make-ezx-color 1 0 0))
-(define white (make-ezx-color 1 1 1))
-(ezx-set-background ezx white)
+(define *ezx* (ezx-init *cols* *rows* ""))
+(define *color-black* (make-ezx-color 0 0 0))
+(define *color-white* (make-ezx-color 1 1 1))
+
+(define (draw-pixel x y color)
+  (ezx-point-2d *ezx* x y color))
+
+(define (init-display)
+  (ezx-set-background *ezx* *color-white*))
+
+(define (refresh-display)
+  (ezx-redraw *ezx*))
 
 ;; Returns #t if the pixel was erased (i.e. 1 -> 0)
 (define (update-pixel x y val)
   (let* ((index (if (< x *cols-per-value*)
                     (* *values-per-row* y)
                     (+ (* *values-per-row* y) 1)))
-         (pixels (u32vector-ref *pixels* index))
+         (bits (u32vector-ref *pixels* index))
          (shift (- *cols-per-value* (modulo x *cols-per-value*) 1))
-         (curr (if (= (bitwise-and (arithmetic-shift #x1 shift) pixels) 0) 0 1))
-         (new (bitwise-xor curr val)))
-    ;; Update pixel bitmap
-    (u32vector-set!
-     *pixels*
-     index
-     ;; Set current bit to new value
-     (bitwise-ior (arithmetic-shift new shift)
-                  ;; Clear current bit
-                  (bitwise-and pixels (bitwise-not (arithmetic-shift #x1 shift)))))
+         (curr (if (= (bitwise-and (arithmetic-shift #x1 shift) bits) 0) 0 1))
+         ;; New pixel value
+         (new (bitwise-xor curr val))
+         ;; Clear current bit
+         (bits (bitwise-and bits (bitwise-not (arithmetic-shift #x1 shift)))))
+    ;; Update pixel bitmap by setting new value in place of current bit
+    (u32vector-set! *pixels* index
+                    (bitwise-ior (arithmetic-shift new shift) bits))
     ;; Draw pixel
-    (ezx-point-2d ezx x y (if (> new 0) black white))
-    ;; Current pixel is erased iff both are 1
+    (draw-pixel x y (if (= new 0) *color-white* *color-black*))
+    ;; Current pixel was erased iff both are 1
     (and (= curr 1) (= val 1))))
 
 ;; Returns #t if any pixels were erased (i.e. 1 -> 0)
@@ -382,7 +387,11 @@
 ;; Main
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; Initialization
+(init-display)
+
 ;; Load test ROM
+;; TODO: load rom from command line arg
 (let ((port (open-input-file "test_opcode.ch8")))
 ;;(let ((port (open-input-file "c8_test.c8")))
   (let loop ((i 0))
@@ -399,7 +408,7 @@
          (op (or (jump-ops msb lsb) (ops msb lsb))))
     (if op
         (begin
-          (ezx-redraw ezx)          
+          (refresh-display)
           (print-instruction msb lsb #f)
 ;;          (print-registers) (print)
           (if (> *DT* 0) (set! *DT* (- *DT* 1)))
