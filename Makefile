@@ -9,7 +9,7 @@ CSC=csc
 SRC_DIR=src
 BUILD_DIR=build
 
-build:
+build: $(SRC_DIR)/*.scm
 	mkdir -p $(BUILD_DIR)
 	$(DOCKER) run $(DOCKER_RUN_FLAGS) $(DOCKER_IMAGE) $(CSC) $(SRC_DIR)/*.scm -o $(BUILD_DIR)/$(PROGRAM_NAME)
 
