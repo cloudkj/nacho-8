@@ -1,4 +1,5 @@
-(declare (unit display))
+(declare (unit display)
+         (uses util))
 
 (use ezxdisp)
 
