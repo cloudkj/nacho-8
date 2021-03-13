@@ -16,15 +16,36 @@
 
 ;;; ezxdisp helpers
 
-(define *ezx* (ezx-init *cols* *rows* ""))
+(define *ezx*)
+
+(define *rows-scale* 1)
+(define *cols-scale* 1)
+
 (define *color-black* (make-ezx-color 0 0 0))
 (define *color-white* (make-ezx-color 1 1 1))
 
 (define (draw-pixel x y color)
-  (ezx-point-2d *ezx* x y color))
+  (let ((x0 (* *cols-scale* x))
+        (y0 (* *rows-scale* y)))
+    (ezx-fillrect-2d *ezx*
+                     x0 y0
+                     (+ x0 *cols-scale*) (+ y0 *rows-scale*)
+                     color)))
 
-(define (init-display)
-  (ezx-set-background *ezx* *color-white*))
+;; Returns #t if the display was initialized successfully
+(define (init-display width height)
+  ;; Ensure that the desired width and height are of valid dimensions
+  (cond ((and width (> (modulo width *cols*) 0) (> width 0))
+         #f)
+        ((and height (> (modulo height *rows*) 0) (> height 0))
+         #f)
+        (else
+         (if width (set! *cols-scale* (/ width *cols*)))
+         (if height (set! *rows-scale* (/ height *rows*)))
+         (set! *ezx*
+               (ezx-init (* *cols-scale* *cols*) (* *rows-scale* *rows*) ""))
+         (ezx-set-background *ezx* *color-white*)
+         #t)))
 
 (define (refresh-display)
   (ezx-redraw *ezx*))
