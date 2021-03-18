@@ -141,11 +141,18 @@
           (u8vector-set! *ram* (+ *I* i) (u8vector-ref *V* i))
           (loop (+ i 1))))))
 
-(define-op-with-x (ld-vx-dt msb lsb)
-  (u8vector-set! *V* x *DT*))
+(define-op-with-x (ld-st-vx msb lsb)
+  (set! *ST* (u8vector-ref *V* x)))
 
 (define-op-with-x (ld-vx-byte msb lsb)
   (u8vector-set! *V* x lsb))
+
+(define-op-with-x (ld-vx-dt msb lsb)
+  (u8vector-set! *V* x *DT*))
+
+(define-op-with-x (ld-vx-k msb lsb)
+  (print "TODO: implement ld-vx-k")
+  #f)
 
 (define-op-with-x (ld-vx-i msb lsb)
   (let loop ((i 0))
@@ -186,6 +193,10 @@
     (u8vector-set! *V* #xF (bitwise-and Vx 1))
     (u8vector-set! *V* x (arithmetic-shift Vx -1))))
 
+(define-op-with-x (sknp-vx msb lsb)
+  (print "TODO: implement sknp-vx")
+  #f)
+
 (define-op-with-x (sne-vx-byte msb lsb)
   (if (not (= (u8vector-ref *V* x) lsb))
       (set! *PC* (+ *PC* 2))))
@@ -207,6 +218,15 @@
 (define-op-with-xy (xor-vx-vy msb lsb)
   (u8vector-set! *V* x (bitwise-xor (u8vector-ref *V* x)
                                     (u8vector-ref *V* y))))
+
+(define (input-ops msb lsb)
+  (let ((op (cond
+             ((and (= #xE0 (bitwise-and msb #xF0)) (= lsb #xA1))
+              sknp-vx)
+             ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x0A))
+              ld-vx-k)
+             (else #f))))
+    (if op (lambda () (op msb lsb)) #f)))
 
 (define (jump-ops msb lsb)
   (let ((op (cond
@@ -263,6 +283,8 @@
               ld-vx-dt)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x15))
               ld-dt-vx)
+             ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x18))
+              ld-st-vx)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x1E))
               add-i-vx)
              ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x33))

@@ -42,7 +42,7 @@
   ;; TODO: implement clock rate
   (let* ((msb (u8vector-ref *ram* *PC*))
          (lsb (u8vector-ref *ram* (+ *PC* 1)))
-         (op (or (jump-ops msb lsb) (ops msb lsb))))
+         (op (or (input-ops msb lsb) (jump-ops msb lsb) (ops msb lsb))))
     (if op
         (begin
           (refresh-display)
