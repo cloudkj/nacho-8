@@ -1,4 +1,4 @@
-(declare (uses cpu debug display util))
+(declare (uses cpu debug display events util))
 
 (use getopt-long srfi-4)
 
@@ -39,16 +39,19 @@
           (loop (+ i 1)))))))
 
 (define (execute)
-  ;; TODO: implement clock rate
   (let* ((msb (u8vector-ref *ram* *PC*))
          (lsb (u8vector-ref *ram* (+ *PC* 1)))
-         (op (or (input-ops msb lsb) (jump-ops msb lsb) (ops msb lsb))))
+         (op (ops msb lsb)))
     (if op
         (begin
-          (refresh-display)
-          (if (> *DT* 0) (set! *DT* (- *DT* 1)))
-          (if (> *ST* 0) (set! *ST* (- *ST* 1)))
-          (op)
+          ;; Execute instruction and increment program counter if applicable
+          (op msb lsb)
+          (unless (member op *jump-ops*) (set! *PC* (+ *PC* 2)))
+          ;; Directly refresh display after each DRW operation if refresh timer
+          ;; is disabled
+          (if (and (not (timer-based-refresh?)) (= op drw-vx-vy-nibble))
+              (refresh-display))
+          (process-events)
           (execute))
         (begin
           (print-instruction msb lsb "Instruction not found")
@@ -70,5 +73,6 @@
          (print-program-usage))
         (else
          (begin
+           (init-events)
            (load-rom filename)
            (execute)))))

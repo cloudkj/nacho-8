@@ -1,5 +1,5 @@
 (declare (unit debug)
-         (uses cpu display util))
+         (uses cpu display input util))
 
 (use format srfi-4)
 
@@ -9,6 +9,18 @@
   (format #t "0x~3x: " *PC*)
   (if error (format #t "ERROR: ~A - " error))
   (print (bytes->hex-string msb lsb)))
+
+(define (print-keyboard)
+  (let loop ((i 0)
+             (keys (list))
+             (values (list)))
+    (if (>= i (u8vector-length *keyboard*))
+        (begin
+          (print (apply string-append (reverse keys)))
+          (print (apply string-append (reverse values))))
+        (loop (+ i 1)
+              (cons (format #f " ~x " i) keys)
+              (cons (format #f " ~d " (u8vector-ref *keyboard* i)) values)))))
 
 (define (print-pixels)
   (let loop ((i 0))

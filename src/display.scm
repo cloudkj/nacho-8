@@ -1,7 +1,6 @@
-(declare (unit display)
-         (uses util))
+(declare (unit display))
 
-(use ezxdisp)
+(use (prefix allegro al:) srfi-4)
 
 ;;; Display
 
@@ -14,23 +13,31 @@
 (define *values-per-row* 2)
 (define *pixels* (make-u32vector (* (/ *cols* *cols-per-value*) *rows*) 0))
 
-;;; ezxdisp helpers
-
-(define *ezx*)
-
 (define *rows-scale* 1)
 (define *cols-scale* 1)
 
-(define *color-black* (make-ezx-color 0 0 0))
-(define *color-white* (make-ezx-color 1 1 1))
+(define *color-black* (al:make-color-name "black"))
+(define *color-white* (al:make-color-name "white"))
+
+;;; Display functions
+
+(define (refresh-display)
+  (al:clear-to-color *color-white*)
+  (let draw-pixels ((x 0) (y 0))
+    (cond ((>= y *rows*) 'done)
+          ((>= x *cols*) (draw-pixels 0 (+ y 1)))
+          (else
+           (let ((val (pixel-color x y)))
+             (draw-pixel x y (pixel-color x y))
+             (draw-pixels (+ x 1) y)))))
+  (al:flip-display))
 
 (define (draw-pixel x y color)
   (let ((x0 (* *cols-scale* x))
         (y0 (* *rows-scale* y)))
-    (ezx-fillrect-2d *ezx*
-                     x0 y0
-                     (+ x0 *cols-scale*) (+ y0 *rows-scale*)
-                     color)))
+    (al:draw-rectangle/fill x0 y0
+                            (+ x0 *cols-scale*) (+ y0 *rows-scale*)
+                            color)))
 
 ;; Returns #t if the display was initialized successfully
 (define (init-display width height)
@@ -42,15 +49,19 @@
         (else
          (if width (set! *cols-scale* (/ width *cols*)))
          (if height (set! *rows-scale* (/ height *rows*)))
-         (set! *ezx*
-               (ezx-init (* *cols-scale* *cols*) (* *rows-scale* *rows*) ""))
-         (ezx-set-background *ezx* *color-white*)
          #t)))
 
-(define (refresh-display)
-  (ezx-redraw *ezx*))
-
-;;; Display functions
+;; Returns the color of a pixel at an x, y coordinate
+(define (pixel-color x y)
+;; TODO: remove duplicate portions of this function vs. `update-pixel`
+  (let* ((index (if (< x *cols-per-value*)
+                    (* *values-per-row* y)
+                    (+ (* *values-per-row* y) 1)))
+         (bits (u32vector-ref *pixels* index))
+         (shift (- *cols-per-value* (modulo x *cols-per-value*) 1)))
+    (if (= (bitwise-and (arithmetic-shift #x1 shift) bits) 0)
+        *color-white*
+        *color-black*)))
 
 ;; Returns #t if the pixel was erased (i.e. 1 -> 0)
 (define (update-pixel x y val)
@@ -67,8 +78,6 @@
     ;; Update pixel bitmap by setting new value in place of current bit
     (u32vector-set! *pixels* index
                     (bitwise-ior (arithmetic-shift new shift) bits))
-    ;; Draw pixel
-    (draw-pixel x y (if (= new 0) *color-white* *color-black*))
     ;; Current pixel was erased iff both are 1
     (and (= curr 1) (= val 1))))
 
