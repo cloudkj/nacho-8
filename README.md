@@ -3,20 +3,18 @@ NACHO-8
 
 A CHIP-8 emulator, with extensions.
 
+## Features
+
+* Customizable clock speed, refresh rate
+
 ## Extensions
 
-* Monochrome -> Color (learn colors with CNN?)
+* [TBD] Monochrome -> Color (learn colors with CNN?)
 
 ## Development
 
-Forward X11 from Docker container to macOS host. Pre-requisites on macOS:
-
-* XQuartz installed
-* XQuartz Preferences -> "Security" -> "Allow connections from network
-  clients"
-
-1. [macOS] Run `xhost +localhost`
-2. [macOS] Pass `-e DISPLAY=host.docker.internal:0` to Docker container
+* Use the custom Docker image to run Ubuntu with desktop and VNC server, which
+  can then be accessed at http://localhost:3000. See `Makefile`
 
 ## Resources
 
