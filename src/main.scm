@@ -47,9 +47,9 @@
           ;; Execute instruction and increment program counter if applicable
           (op msb lsb)
           (unless (member op *jump-ops*) (set! *PC* (+ *PC* 2)))
-          ;; Directly refresh display after each DRW operation if refresh timer
-          ;; is disabled
-          (if (and (not (timer-based-refresh?)) (= op drw-vx-vy-nibble))
+          ;; Directly refresh display after each display operation if refresh
+          ;; timer is disabled
+          (if (and (not (timer-based-refresh?)) (member op *display-ops*))
               (refresh-display))
           (process-events)
           (execute))

@@ -53,7 +53,7 @@
 
 ;; Returns the color of a pixel at an x, y coordinate
 (define (pixel-color x y)
-;; TODO: remove duplicate portions of this function vs. `update-pixel`
+  ;; TODO: remove duplicate portions of this function vs. `update-pixel`
   (let* ((index (if (< x *cols-per-value*)
                     (* *values-per-row* y)
                     (+ (* *values-per-row* y) 1)))
@@ -62,6 +62,14 @@
     (if (= (bitwise-and (arithmetic-shift #x1 shift) bits) 0)
         *color-white*
         *color-black*)))
+
+;; Clears all pixels (i.e. all values set to 0)
+(define (clear-pixels)
+  (let loop ((i 0))
+    (if (< i (u32vector-length *pixels*))
+        (begin
+          (u32vector-set! *pixels* i 0)
+          (loop (+ i 1))))))
 
 ;; Returns #t if the pixel was erased (i.e. 1 -> 0)
 (define (update-pixel x y val)

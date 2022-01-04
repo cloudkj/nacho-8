@@ -104,6 +104,9 @@
   (u16vector-set! *stack* *SP* (+ *PC* 2))
   (set! *PC* nnn))
 
+(define (cls msb lsb)
+  (clear-pixels))
+
 (define-op-with-xyn (drw-vx-vy-nibble msb lsb)
   (let ((Vx (u8vector-ref *V* x))
         (Vy (u8vector-ref *V* y)))
@@ -225,6 +228,8 @@
 
 (define (ops msb lsb)
   (cond
+   ((and (= msb #x00) (= lsb #xE0))
+    cls)
    ((and (= msb #x00) (= lsb #xEE))
     ret)
    ((and (>= msb #x10) (<= msb #x1F))
@@ -290,6 +295,9 @@
    ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x65))
     ld-vx-i)
    (else #f)))
+
+(define *display-ops*
+  (list cls drw-vx-vy-nibble))
 
 (define *jump-ops*
   (list ret jp-addr call-addr jp-v0-addr))
