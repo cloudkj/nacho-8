@@ -2,7 +2,7 @@
 
 (use getopt-long srfi-4)
 
-;;; Options handling
+;; Options handling
 
 (define *program-name* "nacho-8")
 (define *program-description* "An emulator for the CHIP-8 system")
@@ -28,7 +28,7 @@
         (string->number (cdr val))
         #f)))
 
-;;;
+;; Execution functions
 
 (define (load-rom filename)
   (let ((port (open-input-file filename)))
@@ -57,7 +57,7 @@
           (print-instruction msb lsb "Instruction not found")
           (print-registers)))))
 
-;;; Run
+;; Entrypoint
 
 (let* ((options (getopt-long (command-line-arguments) *options-grammar*))
        (args (assoc '@ options))

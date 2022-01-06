@@ -3,6 +3,8 @@
 
 (use (prefix allegro al:))
 
+;;; Events
+
 ;; The clock rate (the frequency at which operations are executed) also
 ;; determines the event handler timeout, or the amount of time spend waiting for
 ;; events on the event queue. For example, a clock rate of 500 hertz corresponds
@@ -20,8 +22,9 @@
 (define *display*)
 (define *event-queue*)
 (define *timer*)
-
 (define *refresh-timer*)
+
+;;; Event handling functions
 
 ;; Initialize and register resources to enable event handling
 (define (init-events)

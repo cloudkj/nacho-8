@@ -4,7 +4,7 @@
 
 ;;; Utility functions
 
-;;; String helpers
+;; String helpers
 
 (define (bytes->hex-string msb lsb)
   (format #f "0x~2,'0x~2,'0x" msb lsb))
