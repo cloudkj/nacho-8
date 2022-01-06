@@ -6,7 +6,7 @@
 ;;; Debugging functions
 
 (define (print-instruction msb lsb error)
-  (format #t "0x~3x: " *PC*)
+  (format #t "0x~3,48x: " *PC*)
   (if error (format #t "ERROR: ~A - " error))
   (print (bytes->hex-string msb lsb)))
 
@@ -29,6 +29,14 @@
           (print (number->binary-string (u32vector-ref *pixels* i))
                  (number->binary-string (u32vector-ref *pixels* (+ i 1))))
           (loop (+ i 2))))))
+
+(define (print-ram)
+  (let loop ((i 0))
+    (if (< i (u8vector-length *ram*))
+        (begin
+          (format #t "RAM 0x~3,48x: " i)
+          (print (u8->hex-string (u8vector-ref *ram* i)))
+          (loop (+ i 1))))))
 
 (define (print-registers)
   (let loop ((i 0)
