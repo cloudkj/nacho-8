@@ -67,6 +67,37 @@
 
 (define *ram* (make-u8vector (* 4 1024) 0))
 
+(define *sprite-length* 5)
+
+;; Initialize memory with preset sprites for hexadecimal digits, where each
+;; sprite is stored at the memory address equivalent to the hexadecimal digit
+;; represented by the sprite: `value * sprite-length`. E.g. sprite for #xB is
+;; stored at memory address #xB * 5 = 11 * 5 = 55
+(map (lambda (sprite)
+       (let ((location (* (car sprite) *sprite-length*))
+             (bytes (cdr sprite)))
+         (let loop ((i 0))
+           (if (< i (u8vector-length bytes))
+               (begin
+                 (u8vector-set! *ram* (+ location i) (u8vector-ref bytes i))
+                 (loop (+ i 1)))))))
+     (list (cons #x0 (u8vector #xF0 #x90 #x90 #x90 #xF0))
+           (cons #x1 (u8vector #x20 #x60 #x20 #x20 #x70))
+           (cons #x2 (u8vector #xF0 #x10 #xF0 #x80 #xF0))
+           (cons #x3 (u8vector #xF0 #x10 #xF0 #x10 #xF0))
+           (cons #x4 (u8vector #x90 #x90 #xF0 #x10 #x10))
+           (cons #x5 (u8vector #xF0 #x80 #xF0 #x10 #xF0))
+           (cons #x6 (u8vector #xF0 #x80 #xF0 #x90 #xF0))
+           (cons #x7 (u8vector #xF0 #x10 #x20 #x40 #x40))
+           (cons #x8 (u8vector #xF0 #x90 #xF0 #x90 #xF0))
+           (cons #x9 (u8vector #xF0 #x90 #xF0 #x10 #xF0))
+           (cons #xA (u8vector #xF0 #x90 #xF0 #x90 #x90))
+           (cons #xB (u8vector #xE0 #x90 #xE0 #x90 #xE0))
+           (cons #xC (u8vector #xF0 #x80 #x80 #x80 #xF0))
+           (cons #xD (u8vector #xE0 #x90 #x90 #x90 #xE0))
+           (cons #xE (u8vector #xF0 #x80 #xF0 #x80 #xF0))
+           (cons #xF (u8vector #xF0 #x80 #xF0 #x80 #x80))))
+
 ;;; Registers
 
 (define *stack* (make-u16vector 16 0))
@@ -134,6 +165,11 @@
 (define-op-with-x (ld-dt-vx msb lsb)
   (set! *DT* (u8vector-ref *V* x)))
 
+(define-op-with-x (ld-f-vx msb lsb)
+  (let ((Vx (u8vector-ref *V* x)))
+    (assert (and (<= 0 Vx) (< Vx 16)))
+    (set! *I* (* Vx *sprite-length*))))
+
 (define-op-with-nnn (ld-i-addr msb lsb)
   (set! *I* nnn))
 
@@ -165,7 +201,7 @@
           (loop (+ i 1))))))
 
 (define-op-with-xy (ld-vx-vy msb lsb)
-  (u8vector-set! *V* y (u8vector-ref *V* x)))
+  (u8vector-set! *V* x (u8vector-ref *V* y)))
 
 (define-op-with-xy (or-vx-vy msb lsb)
   (u8vector-set! *V* x (bitwise-ior (u8vector-ref *V* x)
@@ -225,6 +261,12 @@
 (define-op-with-xy (xor-vx-vy msb lsb)
   (u8vector-set! *V* x (bitwise-xor (u8vector-ref *V* x)
                                     (u8vector-ref *V* y))))
+
+(define *display-ops*
+  (list cls drw-vx-vy-nibble))
+
+(define *jump-ops*
+  (list ret jp-addr call-addr jp-v0-addr))
 
 (define (ops msb lsb)
   (cond
@@ -288,6 +330,8 @@
     ld-st-vx)
    ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x1E))
     add-i-vx)
+   ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x29))
+    ld-f-vx)
    ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x33))
     ld-b-vx)
    ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x55))
@@ -295,9 +339,3 @@
    ((and (= #xF0 (bitwise-and msb #xF0)) (= lsb #x65))
     ld-vx-i)
    (else #f)))
-
-(define *display-ops*
-  (list cls drw-vx-vy-nibble))
-
-(define *jump-ops*
-  (list ret jp-addr call-addr jp-v0-addr))
