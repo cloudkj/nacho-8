@@ -40,9 +40,9 @@
 
 (define (print-registers)
   (let loop ((i 0)
-             (names (list "  DT " "  I  "))
+             (names (list "  DT " "  ST  " "  I  "))
              (values (map (lambda (r) (string-append (u8->hex-string r) " "))
-                          (list *DT* *I*))))
+                          (list *DT* *ST* *I*))))
     (if (>= i (u8vector-length *V*))
         (begin
           (print (apply string-append (reverse names)))
