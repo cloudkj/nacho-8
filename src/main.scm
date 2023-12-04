@@ -19,7 +19,7 @@
   (format #t "Usage: ~A [OPTIONS] FILENAME\n\n~A.\n\n"
           *program-name*
           *program-description*)
-  (print "Optionals:\n")
+  (print "Options:\n")
   (print (usage *options-grammar*)))
 
 (define (get-numeric-option-value key options)
